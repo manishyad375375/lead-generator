@@ -14,13 +14,18 @@ async function loadSeedAudits(): Promise<Record<string, AuditResult>> {
 
 async function pagespeed(url: string): Promise<{ score: number; loadTimeMs: number }> {
   if (!PSI_KEY) return { score: 0, loadTimeMs: 0 };
-  const endpoint = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=PERFORMANCE&key=${PSI_KEY}`;
-  const res = await fetch(endpoint);
-  if (!res.ok) return { score: 0, loadTimeMs: 0 };
-  const j = await res.json();
-  const score = Math.round((j.lighthouseResult?.categories?.performance?.score ?? 0) * 100);
-  const lcp = j.lighthouseResult?.audits?.["largest-contentful-paint"]?.numericValue ?? 0;
-  return { score, loadTimeMs: Math.round(lcp) };
+  try {
+    const endpoint = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=PERFORMANCE&key=${PSI_KEY}`;
+    const res = await fetch(endpoint);
+    if (!res.ok) return { score: 0, loadTimeMs: 0 };
+    const j = await res.json();
+    const score = Math.round((j.lighthouseResult?.categories?.performance?.score ?? 0) * 100);
+    const lcp = j.lighthouseResult?.audits?.["largest-contentful-paint"]?.numericValue ?? 0;
+    return { score, loadTimeMs: Math.round(lcp) };
+  } catch (error) {
+    console.error("PageSpeed API error:", error);
+    return { score: 0, loadTimeMs: 0 };
+  }
 }
 
 export async function POST(req: Request) {

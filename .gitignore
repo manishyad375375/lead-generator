@@ -40,11 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# deployment temp files
-.azure-deploy/
+# deployment artifacts
 *.zip
-aca-deploy.ps1
-azure-deploy.ps1
+.azure-deploy/
+publish-profile.xml
 deploy.ps1
 deploy.sh
-
+aca-deploy.ps1
+azure-deploy.ps1

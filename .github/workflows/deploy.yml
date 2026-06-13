@@ -1,9 +1,12 @@
-name: Deploy to Azure Container Apps
+# -----------------------------------------------------------
+# deploy.yml - GitHub Actions workflow for Azure App Service
+# Triggers on push to main branch
+# -----------------------------------------------------------
+name: Deploy to Azure App Service
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -11,56 +14,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Source Code
+      # 1. Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Azure
-        uses: azure/login@v2
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          node-version: "22"
+          cache: "npm"
 
-      - name: Log in to Azure Container Registry (ACR)
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build Next.js (standalone output)
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      # 5. Package standalone output for Azure
+      - name: Package for Azure
         run: |
-          az acr login --name upsregistrydep
+          mkdir -p deploy-package
+          cp -r .next/standalone/* deploy-package/
+          cp -r .next/static deploy-package/.next/static
+          cp -r public deploy-package/public || true
+          cp -r data deploy-package/data
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+      # 6. Deploy to Azure App Service
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: upsregistrydep.azurecr.io/lead-to-launch-app:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy to Azure Container Apps
-        uses: azure/CLI@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            # Enable admin on ACR if not already enabled (required for ACA registry pull)
-            az acr update --name upsregistrydep --admin-enabled true
-            
-            # Fetch ACR credentials
-            ACR_USER=$(az acr credential show --name upsregistrydep --query "username" -o tsv)
-            ACR_PASS=$(az acr credential show --name upsregistrydep --query "passwords[0].value" -o tsv)
-            
-            # Create/Update Container App inside existing environment ups-env in Central India
-            az containerapp create \
-              --name lead-to-launch-app \
-              --resource-group UPS_DEPLOYMENT \
-              --environment ups-env \
-              --image upsregistrydep.azurecr.io/lead-to-launch-app:latest \
-              --target-port 8080 \
-              --ingress external \
-              --registry-server upsregistrydep.azurecr.io \
-              --registry-username $ACR_USER \
-              --registry-password $ACR_PASS \
-              --env-vars \
-                NODE_ENV=production \
-                NEXT_TELEMETRY_DISABLED=1 \
-                PORT=8080 \
-                HOSTNAME=0.0.0.0
+          app-name: "lead-to-launch-app"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy-package
