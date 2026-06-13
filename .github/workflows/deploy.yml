@@ -38,7 +38,7 @@ jobs:
       # 5. Package standalone output for Azure
       - name: Package for Azure
         run: |
-          mkdir -p deploy-package
+          mkdir -p deploy-package/.next
           cp -r .next/standalone/* deploy-package/
           cp -r .next/static deploy-package/.next/static
           cp -r public deploy-package/public || true
